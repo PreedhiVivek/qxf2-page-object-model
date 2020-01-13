@@ -57,6 +57,7 @@ class Base_Page(Borg,unittest.TestCase):
             self.tesults_flag = False
             self.images = []
             self.browserstack_flag = False
+            self.highlight_flag = False # When set to True, webelement being operated upon will be highlighted
             self.test_run_id = None
             self.reset()
         self.base_url = base_url
@@ -354,40 +355,41 @@ class Base_Page(Borg,unittest.TestCase):
 
         return value
 
-    def highlight_element(self,elements,wait_seconds=3):
-        """Highlights a Selenium webdriver element"""
+    def get_element_attribute_value(self,element,attribute_name):
+        "Return the elements attribute value if present"
+        attribute_value = None
+        if (hasattr(element,attribute_name)):
+            attribute_value = element.get_attribute(attribute_name) 
         
-        if (isinstance(elements, object)):
-            element = elements
-            if(hasattr(element,'style')):
-                original_style = element.get_attribute('style')
-            else:
-                original_style = None
-                self.apply_style_to_element(element,"border: 4px solid #F6F7AD;")
-                self.wait(wait_seconds)
-                self.apply_style_to_element(element,original_style)
-        else:
-            for count,element in enumerate(elements): 
-                if(hasattr(element,'style')):
-                    original_style = element.get_attribute('style')
-                else:
-                    original_style = None
-                self.apply_style_to_element(element,"border: 4px solid #F6F7AD;")
-                self.wait(wait_seconds)
-                self.apply_style_to_element(element,original_style)
-        
+        return attribute_value
+
+    def highlight_element(self,element,wait_seconds=3):
+        "Highlights a Selenium webdriver element"
+        original_style = self.get_element_attribute_value(element,'style')
+        self.apply_style_to_element(element,"border: 4px solid #F6F7AD;")
+        self.wait(wait_seconds)
+        self.apply_style_to_element(element,original_style)
+      
+    def highlight_elements(self,elements,wait_seconds=3):
+        "Highlights a group of elements"
+        original_styles = []
+        for element in elements:
+            original_styles.append(self.get_element_attribute_value(element,'style'))
+            self.apply_style_to_element(element,"border: 4px solid #F6F7AD;")
+        self.wait(wait_seconds)
+        for style,element in zip(original_styles, elements) :
+            self.apply_style_to_element(element,style)
+
     def apply_style_to_element(self,element,element_style):
-        self.driver = element._parent
         self.driver.execute_script("arguments[0].setAttribute('style', arguments[1])", element, element_style)
-        
-        
-    def get_element(self,locator,verbose_flag=True,highlight_flag=True):
+       
+    def get_element(self,locator,verbose_flag=True):
         "Return the DOM element of the path or 'None' if the element is not found "
         dom_element = None
         try:            
             locator = self.split_locator(locator)            
             dom_element = self.driver.find_element(*locator)           
-            if highlight_flag is True:
+            if self.highlight_flag is True:
                 self.highlight_element(dom_element) 
         except Exception as e:            
             if verbose_flag is True:
@@ -396,7 +398,6 @@ class Base_Page(Borg,unittest.TestCase):
             self.exceptions.append("Check your locator-'%s,%s' in the conf/locators.conf file" %(locator[0],locator[1]))
                
         return dom_element
-
 
     def split_locator(self,locator):
         "Split the locator type and locator"
@@ -409,15 +410,14 @@ class Base_Page(Borg,unittest.TestCase):
               
         return result
 
-
-    def get_elements(self,locator,msg_flag=True, highlight_flag=True):
+    def get_elements(self,locator,msg_flag=True):
         "Return a list of DOM elements that match the locator"
         dom_elements = []
         try:
             locator = self.split_locator(locator)
             dom_elements = self.driver.find_elements(*locator)
-            if highlight_flag is True:
-                self.highlight_element(dom_elements)
+            if self.highlight_flag is True:
+                self.highlight_elements(dom_elements)
         except Exception as e:
             if msg_flag==True:
                 self.write(str(e),'debug')
